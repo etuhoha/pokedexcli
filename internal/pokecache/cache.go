@@ -1,6 +1,7 @@
 package pokecache
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -23,6 +24,8 @@ func (c *Cache) Add(key string, val []byte) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 	c.data[key] = entry
+	fmt.Printf("CACHE add: %v\n", key)
+
 }
 
 func (c *Cache) Get(key string) ([]byte, bool) {
@@ -31,8 +34,11 @@ func (c *Cache) Get(key string) ([]byte, bool) {
 
 	entry, ok := c.data[key]
 	if ok {
+		fmt.Printf("CACHE hit: %v\n", key)
 		return entry.val, true
 	}
+	fmt.Printf("CACHE miss: %v\n", key)
+
 	return nil, false
 }
 
@@ -50,6 +56,7 @@ func (c *Cache) reap() {
 
 	for key, entry := range c.data {
 		if entry.createdAt.Before(oldestAllowed) {
+			fmt.Printf("CACHE clearing: %v\n", key)
 			delete(c.data, key)
 		}
 	}

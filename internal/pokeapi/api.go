@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
+
+	"github.com/etuhoha/pokedexcli/internal/pokecache"
 )
 
 type location struct {
@@ -19,16 +22,22 @@ type locationResponse struct {
 	Results  []location `json:"results"`
 }
 
-func Map(url string) (next string, prev string, err error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return "", "", err
-	}
-	defer resp.Body.Close()
+var cache = pokecache.NewCache(5 * time.Second)
 
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", "", err
+func Map(url string) (next string, prev string, err error) {
+	data, ok := cache.Get(url)
+	if !ok {
+		resp, err := http.Get(url)
+		if err != nil {
+			return "", "", err
+		}
+		defer resp.Body.Close()
+
+		data, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return "", "", err
+		}
+		cache.Add(url, data)
 	}
 
 	locResp := locationResponse{}
