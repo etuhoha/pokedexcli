@@ -2,14 +2,34 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 )
 
 type cliCommand struct {
 	name       string
 	decription string
-	callback   func() error
+	callback   func(*commandConfig) error
+}
+
+type commandConfig struct {
+	nextURL string
+	prevURL string
+}
+
+type location struct {
+	Name string `json:"name"`
+	Url  string `json:"url"`
+}
+
+type locationResponse struct {
+	Count    int        `json:"count"`
+	Next     string     `json:"next"`
+	Previous string     `json:"previous"`
+	Results  []location `json:"results"`
 }
 
 func commands() []cliCommand {
@@ -24,16 +44,28 @@ func commands() []cliCommand {
 			decription: "Exit the Pokedex",
 			callback:   commandExit,
 		},
+		{
+			name:       "map",
+			decription: "List next location areas",
+			callback:   commandMap,
+		},
+		{
+			name:       "mapb",
+			decription: "List previous location areas",
+			callback:   commandMapB,
+		},
 	}
 }
 
 func main() {
 	scanner := bufio.NewScanner(os.Stdin)
+
+	var cmdConf commandConfig
+
 	for {
 		fmt.Print("Pokedex > ")
 		ok := scanner.Scan()
 		if !ok {
-			fmt.Printf("scanner error: %v\n", scanner.Err())
 			break
 		}
 
@@ -42,14 +74,17 @@ func main() {
 
 		for _, cmd := range commands() {
 			if tokens[0] == cmd.name {
-				cmd.callback()
+				err := cmd.callback(&cmdConf)
+				if err != nil {
+					fmt.Printf("ERROR: %v", err)
+				}
 				break
 			}
 		}
 	}
 }
 
-func commandHelp() error {
+func commandHelp(*commandConfig) error {
 	fmt.Println("Welcome to the Pokedex!")
 	fmt.Println("Usage: ")
 	fmt.Println("")
@@ -59,8 +94,54 @@ func commandHelp() error {
 	return nil
 }
 
-func commandExit() error {
+func commandExit(*commandConfig) error {
 	fmt.Println("Closing the Pokedex... Goodbye!")
 	os.Exit(0)
+	return nil
+}
+
+func commandMap(config *commandConfig) error {
+	url := config.nextURL
+	if len(url) == 0 {
+		url = "https://pokeapi.co/api/v2/location-area"
+	}
+
+	return listMap(url, config)
+}
+
+func commandMapB(config *commandConfig) error {
+	url := config.prevURL
+	if len(url) == 0 {
+		fmt.Println("you're on the first page")
+		return nil
+	}
+
+	return listMap(url, config)
+}
+
+func listMap(url string, config *commandConfig) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	locResp := locationResponse{}
+	err = json.Unmarshal(data, &locResp)
+	if err != nil {
+		return err
+	}
+
+	for _, l := range locResp.Results {
+		fmt.Printf("%v\n", l.Name)
+	}
+
+	config.nextURL = locResp.Next
+	config.prevURL = locResp.Previous
 	return nil
 }
