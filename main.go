@@ -2,11 +2,10 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
+
+	"github.com/etuhoha/pokedexcli/pokeapi"
 )
 
 type cliCommand struct {
@@ -18,18 +17,6 @@ type cliCommand struct {
 type commandConfig struct {
 	nextURL string
 	prevURL string
-}
-
-type location struct {
-	Name string `json:"name"`
-	Url  string `json:"url"`
-}
-
-type locationResponse struct {
-	Count    int        `json:"count"`
-	Next     string     `json:"next"`
-	Previous string     `json:"previous"`
-	Results  []location `json:"results"`
 }
 
 func commands() []cliCommand {
@@ -120,28 +107,13 @@ func commandMapB(config *commandConfig) error {
 }
 
 func listMap(url string, config *commandConfig) error {
-	resp, err := http.Get(url)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	data, err := io.ReadAll(resp.Body)
+	next, prev, err := pokeapi.Map(url)
 	if err != nil {
 		return err
 	}
 
-	locResp := locationResponse{}
-	err = json.Unmarshal(data, &locResp)
-	if err != nil {
-		return err
-	}
-
-	for _, l := range locResp.Results {
-		fmt.Printf("%v\n", l.Name)
-	}
-
-	config.nextURL = locResp.Next
-	config.prevURL = locResp.Previous
+	config.nextURL = next
+	config.prevURL = prev
 	return nil
+
 }
