@@ -3,9 +3,8 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"internal/pokeapi"
 	"os"
-
-	"github.com/etuhoha/pokedexcli/pokeapi"
 )
 
 type cliCommand struct {
