@@ -4,8 +4,10 @@ import "strings"
 
 func cleanInput(text string) []string {
 	var result []string
-	for _, s := range strings.Split(strings.TrimSpace(text), " ") {
-		result = append(result, strings.ToLower(s))
+	for s := range strings.SplitSeq(strings.TrimSpace(text), " ") {
+		if len(s) > 0 {
+			result = append(result, strings.ToLower(s))
+		}
 	}
 	return result
 }
