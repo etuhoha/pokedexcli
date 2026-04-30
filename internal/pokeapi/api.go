@@ -2,7 +2,6 @@ package pokeapi
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -24,31 +23,125 @@ type locationResponse struct {
 
 var cache = pokecache.NewCache(5 * time.Second)
 
-func Map(url string) (next string, prev string, err error) {
+type MapResponse struct {
+	Areas []string
+	Next  string
+	Prev  string
+}
+
+func Map(url string) (MapResponse, error) {
 	data, ok := cache.Get(url)
 	if !ok {
 		resp, err := http.Get(url)
 		if err != nil {
-			return "", "", err
+			return MapResponse{}, err
 		}
 		defer resp.Body.Close()
 
 		data, err = io.ReadAll(resp.Body)
 		if err != nil {
-			return "", "", err
+			return MapResponse{}, err
 		}
 		cache.Add(url, data)
 	}
 
 	locResp := locationResponse{}
-	err = json.Unmarshal(data, &locResp)
+	err := json.Unmarshal(data, &locResp)
 	if err != nil {
-		return "", "", err
+		return MapResponse{}, err
 	}
 
+	mapResp := MapResponse{}
 	for _, l := range locResp.Results {
-		fmt.Printf("%v\n", l.Name)
+		mapResp.Areas = append(mapResp.Areas, l.Name)
+	}
+	mapResp.Next = locResp.Next
+	mapResp.Prev = locResp.Previous
+	return mapResp, nil
+}
+
+type exploreResponse struct {
+	EncounterMethodRates []struct {
+		EncounterMethod struct {
+			Name string `json:"name"`
+			URL  string `json:"url"`
+		} `json:"encounter_method"`
+		VersionDetails []struct {
+			Rate    int `json:"rate"`
+			Version struct {
+				Name string `json:"name"`
+				URL  string `json:"url"`
+			} `json:"version"`
+		} `json:"version_details"`
+	} `json:"encounter_method_rates"`
+	GameIndex int `json:"game_index"`
+	ID        int `json:"id"`
+	Location  struct {
+		Name string `json:"name"`
+		URL  string `json:"url"`
+	} `json:"location"`
+	Name  string `json:"name"`
+	Names []struct {
+		Language struct {
+			Name string `json:"name"`
+			URL  string `json:"url"`
+		} `json:"language"`
+		Name string `json:"name"`
+	} `json:"names"`
+	PokemonEncounters []struct {
+		Pokemon struct {
+			Name string `json:"name"`
+			URL  string `json:"url"`
+		} `json:"pokemon"`
+		VersionDetails []struct {
+			EncounterDetails []struct {
+				Chance          int   `json:"chance"`
+				ConditionValues []any `json:"condition_values"`
+				MaxLevel        int   `json:"max_level"`
+				Method          struct {
+					Name string `json:"name"`
+					URL  string `json:"url"`
+				} `json:"method"`
+				MinLevel int `json:"min_level"`
+			} `json:"encounter_details"`
+			MaxChance int `json:"max_chance"`
+			Version   struct {
+				Name string `json:"name"`
+				URL  string `json:"url"`
+			} `json:"version"`
+		} `json:"version_details"`
+	} `json:"pokemon_encounters"`
+}
+
+func ExploreArea(area string) ([]string, error) {
+	url := "https://pokeapi.co/api/v2/location-area/" + area
+
+	data, ok := cache.Get(url)
+	if !ok {
+		resp, err := http.Get(url)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+
+		data, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		cache.Add(url, data)
 	}
 
-	return locResp.Next, locResp.Previous, nil
+	expResp := exploreResponse{}
+	err := json.Unmarshal(data, &expResp)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]string, 0)
+	for _, pe := range expResp.PokemonEncounters {
+		result = append(result, pe.Pokemon.Name)
+	}
+
+	return result, nil
+
 }

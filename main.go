@@ -11,7 +11,7 @@ import (
 type cliCommand struct {
 	name       string
 	decription string
-	callback   func(*commandConfig) error
+	callback   func(*commandConfig, []string) error
 }
 
 type commandConfig struct {
@@ -41,13 +41,18 @@ func commands() []cliCommand {
 			decription: "List previous location areas",
 			callback:   commandMapB,
 		},
+		{
+			name:       "explore",
+			decription: "Explore an area",
+			callback:   commandExplore,
+		},
 	}
 }
 
 func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 
-	var cmdConf commandConfig
+	var config commandConfig
 
 	for {
 		fmt.Print("Pokedex > ")
@@ -61,7 +66,7 @@ func main() {
 
 		for _, cmd := range commands() {
 			if tokens[0] == cmd.name {
-				err := cmd.callback(&cmdConf)
+				err := cmd.callback(&config, tokens[1:])
 				if err != nil {
 					fmt.Printf("ERROR: %v", err)
 				}
@@ -71,7 +76,7 @@ func main() {
 	}
 }
 
-func commandHelp(*commandConfig) error {
+func commandHelp(config *commandConfig, args []string) error {
 	fmt.Println("Welcome to the Pokedex!")
 	fmt.Println("Usage: ")
 	fmt.Println("")
@@ -81,13 +86,13 @@ func commandHelp(*commandConfig) error {
 	return nil
 }
 
-func commandExit(*commandConfig) error {
+func commandExit(config *commandConfig, args []string) error {
 	fmt.Println("Closing the Pokedex... Goodbye!")
 	os.Exit(0)
 	return nil
 }
 
-func commandMap(config *commandConfig) error {
+func commandMap(config *commandConfig, args []string) error {
 	url := config.nextURL
 	if len(url) == 0 {
 		url = "https://pokeapi.co/api/v2/location-area"
@@ -96,7 +101,7 @@ func commandMap(config *commandConfig) error {
 	return listMap(url, config)
 }
 
-func commandMapB(config *commandConfig) error {
+func commandMapB(config *commandConfig, args []string) error {
 	url := config.prevURL
 	if len(url) == 0 {
 		fmt.Println("you're on the first page")
@@ -107,13 +112,33 @@ func commandMapB(config *commandConfig) error {
 }
 
 func listMap(url string, config *commandConfig) error {
-	next, prev, err := pokeapi.Map(url)
+	mapResp, err := pokeapi.Map(url)
 	if err != nil {
 		return err
 	}
 
-	config.nextURL = next
-	config.prevURL = prev
+	for _, a := range mapResp.Areas {
+		fmt.Printf("%v\n", a)
+	}
+	config.nextURL = mapResp.Next
+	config.prevURL = mapResp.Prev
 	return nil
 
+}
+
+func commandExplore(config *commandConfig, args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("missing area name\n")
+	}
+
+	pokemons, err := pokeapi.ExploreArea(args[0])
+	if err != nil {
+		return err
+	}
+
+	for _, p := range pokemons {
+		fmt.Printf("%v\n", p)
+	}
+
+	return nil
 }
