@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"math/rand"
 	"os"
 
 	"github.com/etuhoha/pokedexcli/internal/pokeapi"
@@ -45,6 +46,11 @@ func commands() []cliCommand {
 			name:       "explore",
 			decription: "Explore an area",
 			callback:   commandExplore,
+		},
+		{
+			name:       "catch",
+			decription: "Catch an pokemon",
+			callback:   commandCatch,
 		},
 	}
 }
@@ -131,13 +137,48 @@ func commandExplore(config *commandConfig, args []string) error {
 		return fmt.Errorf("missing area name\n")
 	}
 
-	pokemons, err := pokeapi.ExploreArea(args[0])
+	pokemonNames, err := pokeapi.ExploreArea(args[0])
 	if err != nil {
 		return err
 	}
 
-	for _, p := range pokemons {
-		fmt.Printf("%v\n", p)
+	for _, name := range pokemonNames {
+		fmt.Printf("%v\n", name)
+	}
+
+	return nil
+}
+
+type Pokemon struct {
+	Name    string
+	BaseExp int
+}
+
+var pokedex = map[string]Pokemon{}
+
+func commandCatch(config *commandConfig, args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("missing pokemon name\n")
+	}
+
+	name := args[0]
+	if _, ok := pokedex[name]; ok {
+		fmt.Println("already caught")
+		return nil
+	}
+
+	resp, err := pokeapi.PokemonStats(name)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Throwing a Pokeball at %v...\n", name)
+	pokemon := Pokemon{Name: name, BaseExp: resp.BaseExp}
+	if rand.Intn(pokemon.BaseExp) < 40 {
+		fmt.Printf("%v was caught!\n", name)
+		pokedex[name] = pokemon
+	} else {
+		fmt.Printf("%v escaped!\n", name)
 	}
 
 	return nil

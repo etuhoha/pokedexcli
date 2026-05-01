@@ -2,6 +2,7 @@ package pokeapi
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -144,4 +145,41 @@ func ExploreArea(area string) ([]string, error) {
 
 	return result, nil
 
+}
+
+type PokemonStatsResponse struct {
+	BaseExp int
+}
+
+func PokemonStats(name string) (PokemonStatsResponse, error) {
+	url := "https://pokeapi.co/api/v2/pokemon/" + name
+
+	data, ok := cache.Get(url)
+	if !ok {
+		resp, err := http.Get(url)
+		if err != nil {
+			return PokemonStatsResponse{}, err
+		}
+		defer resp.Body.Close()
+
+		data, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return PokemonStatsResponse{}, err
+		}
+		cache.Add(url, data)
+	}
+
+	rawJson := map[string]any{}
+	err := json.Unmarshal(data, &rawJson)
+	if err != nil {
+		return PokemonStatsResponse{}, err
+	}
+
+	baseExpRaw := rawJson["base_experience"]
+	baseExp, ok := baseExpRaw.(float64)
+	if !ok {
+		return PokemonStatsResponse{}, fmt.Errorf("can't unmarshal base exp from\n'%T'\n", baseExpRaw)
+	}
+
+	return PokemonStatsResponse{BaseExp: int(baseExp)}, nil
 }
