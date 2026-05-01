@@ -57,6 +57,11 @@ func commands() []cliCommand {
 			decription: "Inspect an captured pokemon",
 			callback:   commandInspect,
 		},
+		{
+			name:       "pokedex",
+			decription: "List all captured pokemon",
+			callback:   commandPokedex,
+		},
 	}
 }
 
@@ -207,6 +212,15 @@ func commandInspect(config *commandConfig, args []string) error {
 	fmt.Printf("Types:\n")
 	for _, tp := range pokemon.Types {
 		fmt.Printf("  - %v\n", tp.Type.Name)
+	}
+
+	return nil
+}
+
+func commandPokedex(config *commandConfig, args []string) error {
+	fmt.Printf("Your Pokedex:\n")
+	for name := range pokedex {
+		fmt.Printf("  - %v\n", name)
 	}
 
 	return nil
