@@ -2,7 +2,6 @@ package pokeapi
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -147,39 +146,91 @@ func ExploreArea(area string) ([]string, error) {
 
 }
 
-type PokemonStatsResponse struct {
-	BaseExp int
+type PokemonStat struct {
+	BaseStat int `json:"base_stat"`
+	Effort   int `json:"effort"`
+	Stat     struct {
+		Name string `json:"name"`
+		URL  string `json:"url"`
+	} `json:"stat"`
 }
 
-func PokemonStats(name string) (PokemonStatsResponse, error) {
+type PokemonType struct {
+	Slot int `json:"slot"`
+	Type struct {
+		Name string `json:"name"`
+		URL  string `json:"url"`
+	} `json:"type"`
+}
+
+type PokemonData struct {
+	Name    string
+	BaseExp int
+	Height  int
+	Weight  int
+	Stats   []PokemonStat
+	Types   []PokemonType
+}
+
+func PokemonStats(name string) (PokemonData, error) {
 	url := "https://pokeapi.co/api/v2/pokemon/" + name
 
 	data, ok := cache.Get(url)
 	if !ok {
 		resp, err := http.Get(url)
 		if err != nil {
-			return PokemonStatsResponse{}, err
+			return PokemonData{}, err
 		}
 		defer resp.Body.Close()
 
 		data, err = io.ReadAll(resp.Body)
 		if err != nil {
-			return PokemonStatsResponse{}, err
+			return PokemonData{}, err
 		}
 		cache.Add(url, data)
 	}
 
-	rawJson := map[string]any{}
+	rawJson := map[string]json.RawMessage{}
 	err := json.Unmarshal(data, &rawJson)
 	if err != nil {
-		return PokemonStatsResponse{}, err
+		return PokemonData{}, err
 	}
 
-	baseExpRaw := rawJson["base_experience"]
-	baseExp, ok := baseExpRaw.(float64)
-	if !ok {
-		return PokemonStatsResponse{}, fmt.Errorf("can't unmarshal base exp from\n'%T'\n", baseExpRaw)
+	var baseExp float64
+	err = json.Unmarshal(rawJson["base_experience"], &baseExp)
+	if err != nil {
+		return PokemonData{}, err
 	}
 
-	return PokemonStatsResponse{BaseExp: int(baseExp)}, nil
+	var height float64
+	err = json.Unmarshal(rawJson["height"], &height)
+	if err != nil {
+		return PokemonData{}, err
+	}
+
+	var weight float64
+	err = json.Unmarshal(rawJson["weight"], &weight)
+	if err != nil {
+		return PokemonData{}, err
+	}
+
+	var stats []PokemonStat
+	err = json.Unmarshal(rawJson["stats"], &stats)
+	if err != nil {
+		return PokemonData{}, err
+	}
+
+	var types []PokemonType
+	err = json.Unmarshal(rawJson["types"], &types)
+	if err != nil {
+		return PokemonData{}, err
+	}
+
+	result := PokemonData{Name: name}
+	result.BaseExp = int(baseExp)
+	result.Height = int(height)
+	result.Weight = int(weight)
+	result.Stats = stats
+	result.Types = types
+	return result, nil
 }
